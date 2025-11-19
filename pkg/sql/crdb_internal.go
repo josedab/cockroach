@@ -232,6 +232,8 @@ var crdbInternal = virtualSchema{
 		catconstants.CrdbInternalStoreLivenessSupportFrom:           crdbInternalStoreLivenessSupportFromTable,
 		catconstants.CrdbInternalStoreLivenessSupportFor:            crdbInternalStoreLivenessSupportForTable,
 		catconstants.CrdbInternalClusterInspectErrorsViewID:         crdbInternalClusterInspectErrorsView,
+		catconstants.CrdbInternalPlanCacheTableID:                    crdbInternalPlanCacheTable,
+		catconstants.CrdbInternalPlanCacheStatsTableID:               crdbInternalPlanCacheStatsTable,
 	},
 	validWithNoDatabaseContext: true,
 }
@@ -9698,4 +9700,28 @@ CREATE VIEW crdb_internal.cluster_inspect_errors AS
 		{Name: "crdb_internal_expiration", Typ: types.TimestampTZ},
 	},
 	comment: `wrapper over system.inspect_errors`,
+}
+
+// crdbInternalPlanCacheTable exposes cached query plans.
+var crdbInternalPlanCacheTable = virtualSchemaTable{
+	comment: "cached query plans for the optimizer (experimental)",
+	schema:  vtable.CrdbInternalPlanCache,
+	populate: func(ctx context.Context, p *planner, db catalog.DatabaseDescriptor, addRow func(...tree.Datum) error) error {
+		// TODO(sql): Integrate with actual plan cache when it's wired into the executor.
+		// Currently returns empty results as the plan cache integration is pending.
+		// The plan cache data structures are in pkg/sql/opt/plancache.
+		return nil
+	},
+}
+
+// crdbInternalPlanCacheStatsTable exposes plan cache statistics.
+var crdbInternalPlanCacheStatsTable = virtualSchemaTable{
+	comment: "plan cache statistics (experimental)",
+	schema:  vtable.CrdbInternalPlanCacheStats,
+	populate: func(ctx context.Context, p *planner, db catalog.DatabaseDescriptor, addRow func(...tree.Datum) error) error {
+		// TODO(sql): Integrate with actual plan cache metrics when it's wired into the executor.
+		// Currently returns empty results as the plan cache integration is pending.
+		// The metrics are defined in pkg/sql/opt/plancache/metrics.go.
+		return nil
+	},
 }

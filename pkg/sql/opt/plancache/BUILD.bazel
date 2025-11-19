@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "plancache",
+    srcs = [
+        "cluster_settings.go",
+        "invalidation.go",
+        "metrics.go",
+        "plan_cache.go",
+    ],
+    importpath = "github.com/cockroachdb/cockroach/pkg/sql/opt/plancache",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/settings",
+        "//pkg/sql/catalog/descpb",
+        "//pkg/sql/opt/memo",
+        "//pkg/sql/opt/props/physical",
+        "//pkg/util/metric",
+        "//pkg/util/syncutil",
+    ],
+)
+
+go_test(
+    name = "plancache_test",
+    srcs = [
+        "plan_cache_test.go",
+    ],
+    embed = [":plancache"],
+    deps = [
+        "//pkg/sql/catalog/descpb",
+        "//pkg/util/leaktest",
+        "//pkg/util/log",
+        "@com_github_stretchr_testify//require",
+    ],
+)
