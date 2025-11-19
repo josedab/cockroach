@@ -1,0 +1,56 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "connexec",
+    srcs = [
+        "coordinator.go",
+        "cursor.go",
+        "interfaces.go",
+        "memory.go",
+        "metrics.go",
+        "retry.go",
+        "session.go",
+        "statement.go",
+        "transaction.go",
+    ],
+    importpath = "github.com/cockroachdb/cockroach/pkg/sql/connexec",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/kv",
+        "//pkg/kv/kvpb",
+        "//pkg/roachpb",
+        "//pkg/security/username",
+        "//pkg/sql/pgwire/pgcode",
+        "//pkg/sql/pgwire/pgerror",
+        "//pkg/sql/sem/tree",
+        "//pkg/sql/sessiondata",
+        "//pkg/util/mon",
+        "@com_github_cockroachdb_errors//:errors",
+    ],
+)
+
+go_test(
+    name = "connexec_test",
+    srcs = [
+        "cursor_test.go",
+        "main_test.go",
+        "metrics_test.go",
+        "retry_test.go",
+        "session_test.go",
+        "transaction_test.go",
+    ],
+    embed = [":connexec"],
+    deps = [
+        "//pkg/security/securityassets",
+        "//pkg/security/securitytest",
+        "//pkg/server",
+        "//pkg/sql/pgwire/pgcode",
+        "//pkg/sql/pgwire/pgerror",
+        "//pkg/sql/sem/tree",
+        "//pkg/sql/sessiondata",
+        "//pkg/testutils/serverutils",
+        "//pkg/util/randutil",
+        "@com_github_cockroachdb_errors//:errors",
+        "@com_github_stretchr_testify//require",
+    ],
+)
