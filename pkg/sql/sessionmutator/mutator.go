@@ -1110,3 +1110,7 @@ func (m *SessionDataMutator) SetDisableWaitForJobsNotice(val bool) {
 func (m *SessionDataMutator) SetCanaryStatsMode(val sessiondatapb.CanaryStatsMode) {
 	m.Data.CanaryStatsMode = val
 }
+
+func (m *SessionDataMutator) SetAdaptiveTimeoutEnabled(val bool) {
+	m.Data.AdaptiveTimeoutEnabled = val
+}

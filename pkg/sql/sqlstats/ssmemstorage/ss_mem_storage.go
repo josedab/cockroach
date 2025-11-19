@@ -406,6 +406,33 @@ func (s *Container) getStatsForStmtWithKey(key stmtKey) (stats *stmtStats) {
 	return stats
 }
 
+// GetAggregatedStatsForStmt returns aggregated statistics for a statement
+// fingerprint ID, combining stats from all plan variants and transaction
+// contexts. Returns nil if no stats exist for the fingerprint.
+func (s *Container) GetAggregatedStatsForStmt(
+	fingerprintID appstatspb.StmtFingerprintID,
+) *appstatspb.StatementStatistics {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var result *appstatspb.StatementStatistics
+	for key, stats := range s.mu.stmts {
+		if key.fingerprintID == fingerprintID {
+			stats.mu.Lock()
+			if result == nil {
+				// First match - copy the stats
+				statsCopy := stats.mu.data
+				result = &statsCopy
+			} else {
+				// Aggregate with existing stats
+				result.Add(&stats.mu.data)
+			}
+			stats.mu.Unlock()
+		}
+	}
+	return result
+}
+
 // tryCreateStatsForStmtWithKey attemps to insert a new stmtStats entry with
 // the given stmtKey and stmtFingerprintID. If the stmtKey exists already
 // we'll return the existing stmtStats object. If the provided stmtFingerprintID

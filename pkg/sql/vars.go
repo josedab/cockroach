@@ -1714,6 +1714,25 @@ var varGen = map[string]sessionVar{
 		},
 	},
 
+	// CockroachDB extension: adaptive_timeout controls whether adaptive
+	// query timeouts based on historical execution patterns are enabled.
+	`adaptive_timeout`: {
+		Set: func(ctx context.Context, m sessionmutator.SessionDataMutator, s string) error {
+			b, err := paramparse.ParseBoolVar("adaptive_timeout", s)
+			if err != nil {
+				return err
+			}
+			m.SetAdaptiveTimeoutEnabled(b)
+			return nil
+		},
+		Get: func(evalCtx *extendedEvalContext, _ *kv.Txn) (string, error) {
+			return formatBoolAsPostgresSetting(evalCtx.SessionData().AdaptiveTimeoutEnabled), nil
+		},
+		GlobalDefault: func(sv *settings.Values) string {
+			return formatBoolAsPostgresSetting(AdaptiveTimeoutEnabled.Get(sv))
+		},
+	},
+
 	`idle_in_session_timeout`: {
 		Hidden:       true, // Superseded by `idle_session_timeout`.
 		GetStringVal: makeTimeoutVarGetter(`idle_in_session_timeout`),

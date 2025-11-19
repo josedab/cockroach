@@ -632,9 +632,56 @@ func (ex *connExecutor) execStmtInOpenState(
 
 	// We exempt `SET` statements from the statement timeout, particularly so as
 	// not to block the `SET statement_timeout` command itself.
-	if ex.sessionData().StmtTimeout > 0 && ast.StatementTag() != "SET" {
+	//
+	// Determine the effective timeout: either static statement_timeout or adaptive.
+	var effectiveTimeout time.Duration
+	if ast.StatementTag() != "SET" {
+		// First, check for static statement_timeout
+		if ex.sessionData().StmtTimeout > 0 {
+			effectiveTimeout = ex.sessionData().StmtTimeout
+		}
+
+		// Check if adaptive timeout is enabled and should override/supplement
+		sv := &ex.server.cfg.Settings.SV
+		adaptiveEnabled := AdaptiveTimeoutEnabled.Get(sv) && ex.sessionData().AdaptiveTimeoutEnabled
+		if adaptiveEnabled && stmt.StmtNoConstants != "" {
+			// Calculate fingerprint ID for this query
+			fingerprintID := appstatspb.ConstructStatementFingerprintID(
+				stmt.StmtNoConstants,
+				os.ImplicitTxn.Get(),
+				ex.sessionData().Database,
+			)
+
+			// Look up historical stats
+			if ex.applicationStats != nil {
+				stats := ex.applicationStats.GetAggregatedStatsForStmt(fingerprintID)
+				if stats != nil {
+					config := GetAdaptiveTimeoutConfig(sv)
+					latencyStats := StatsToQueryLatencyStats(stats)
+					adaptiveTimeout := CalculateAdaptiveTimeout(latencyStats, config)
+
+					// Use adaptive timeout if:
+					// 1. No static timeout is set, OR
+					// 2. Adaptive timeout is shorter (more appropriate for this query)
+					if effectiveTimeout == 0 || adaptiveTimeout < effectiveTimeout {
+						effectiveTimeout = adaptiveTimeout
+						if log.V(2) {
+							log.Infof(ctx, "adaptive timeout: using %s for fingerprint %d (count=%d, p99=%s)",
+								adaptiveTimeout, fingerprintID, latencyStats.ExecutionCount, latencyStats.P99Latency)
+						}
+					}
+				} else if effectiveTimeout == 0 {
+					// No stats and no static timeout - use adaptive default
+					config := GetAdaptiveTimeoutConfig(sv)
+					effectiveTimeout = config.DefaultTimeout
+				}
+			}
+		}
+	}
+
+	if effectiveTimeout > 0 {
 		timerDuration :=
-			ex.sessionData().StmtTimeout - ex.phaseTimes.GetSessionPhaseTime(sessionphase.SessionQueryReceived).Elapsed()
+			effectiveTimeout - ex.phaseTimes.GetSessionPhaseTime(sessionphase.SessionQueryReceived).Elapsed()
 		// There's no need to proceed with execution if the timer has already expired.
 		if timerDuration < 0 {
 			queryTimedOut = true

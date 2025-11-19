@@ -760,6 +760,10 @@ message LocalOnlySessionData {
   // let the system decide based on random selection (mode == auto).
   int64 canary_stats_mode = 193 [(gogoproto.casttype) = "CanaryStatsMode"];
 
+  // AdaptiveTimeoutEnabled indicates whether adaptive query timeouts based on
+  // historical execution patterns are enabled for this session.
+  bool adaptive_timeout_enabled = 194;
+
   ///////////////////////////////////////////////////////////////////////////
   // WARNING: consider whether a session parameter you're adding needs to  //
   // be propagated to the remote nodes. If so, that parameter should live  //

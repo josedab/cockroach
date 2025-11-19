@@ -1,0 +1,190 @@
+# LogicTest: local
+
+# Test adaptive timeout cluster settings and session variables
+
+# Verify default cluster settings for adaptive timeout
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.enabled
+----
+false
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.multiplier
+----
+2
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.min_samples
+----
+10
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.min
+----
+00:00:01
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.max
+----
+00:05:00
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.default
+----
+00:00:30
+
+# Test setting cluster-level adaptive timeout configuration
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.enabled = true
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.enabled
+----
+true
+
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.multiplier = 3.0
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.multiplier
+----
+3
+
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.min_samples = 5
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.min_samples
+----
+5
+
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.min = '2s'
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.min
+----
+00:00:02
+
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.max = '10m'
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.max
+----
+00:10:00
+
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.default = '60s'
+
+query T
+SHOW CLUSTER SETTING sql.adaptive_timeout.default
+----
+00:01:00
+
+# Test invalid values for cluster settings
+statement error value -1 out of range
+SET CLUSTER SETTING sql.adaptive_timeout.min_samples = -1
+
+statement error value 0.5 out of range
+SET CLUSTER SETTING sql.adaptive_timeout.multiplier = 0.5
+
+statement error value 11 out of range
+SET CLUSTER SETTING sql.adaptive_timeout.multiplier = 11
+
+# Test session-level adaptive timeout variable
+query T
+SHOW adaptive_timeout
+----
+on
+
+statement ok
+SET adaptive_timeout = off
+
+query T
+SHOW adaptive_timeout
+----
+off
+
+statement ok
+SET adaptive_timeout = on
+
+query T
+SHOW adaptive_timeout
+----
+on
+
+# Test interaction with statement_timeout
+statement ok
+SET statement_timeout = '5s'
+
+query T
+SHOW statement_timeout
+----
+5000
+
+# Both settings can coexist
+query T
+SHOW adaptive_timeout
+----
+on
+
+# Reset to defaults
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.enabled = false
+
+statement ok
+RESET statement_timeout
+
+statement ok
+RESET adaptive_timeout
+
+query T
+SHOW adaptive_timeout
+----
+off
+
+query T
+SHOW statement_timeout
+----
+0
+
+# Test that adaptive timeout works with the statement statistics system
+# Create a simple table and run some queries to generate stats
+statement ok
+CREATE TABLE adaptive_test (id INT PRIMARY KEY, val STRING)
+
+statement ok
+INSERT INTO adaptive_test VALUES (1, 'a'), (2, 'b'), (3, 'c')
+
+# Run the same query multiple times to build up statistics
+statement ok
+SELECT * FROM adaptive_test WHERE id = 1
+
+statement ok
+SELECT * FROM adaptive_test WHERE id = 1
+
+statement ok
+SELECT * FROM adaptive_test WHERE id = 1
+
+# Enable adaptive timeout
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.enabled = true
+
+statement ok
+SET adaptive_timeout = on
+
+# Verify the query still works with adaptive timeout enabled
+# (it should use the default timeout since we don't have enough samples yet)
+statement ok
+SELECT * FROM adaptive_test WHERE id = 1
+
+# Clean up
+statement ok
+DROP TABLE adaptive_test
+
+statement ok
+SET CLUSTER SETTING sql.adaptive_timeout.enabled = false
+
+statement ok
+RESET adaptive_timeout
