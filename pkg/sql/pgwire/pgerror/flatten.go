@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/docs"
+	"github.com/cockroachdb/cockroach/pkg/settings"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
 	"github.com/cockroachdb/errors"
 )
@@ -133,4 +134,79 @@ const TxnRetryMsgPrefix = "restart transaction"
 // GetPGCode retrieves the error code for an error.
 func GetPGCode(err error) pgcode.Code {
 	return GetPGCodeInternal(err, ComputeDefaultCode)
+}
+
+// FlattenWithSettings is like Flatten but accepts settings to control
+// whether enhanced hints are included in the error.
+func FlattenWithSettings(err error, sv *settings.Values) *Error {
+	if err == nil {
+		return nil
+	}
+
+	resErr := &Error{
+		Code:           GetPGCode(err).String(),
+		Message:        err.Error(),
+		Severity:       GetSeverity(err),
+		ConstraintName: GetConstraintName(err),
+	}
+
+	// Populate the source field if available.
+	if file, line, fn, ok := errors.GetOneLineSource(err); ok {
+		resErr.Source = &Error_Source{File: file, Line: int32(line), Function: fn}
+	}
+
+	// Add serialization failure hints if available.
+	if resErr.Code == pgcode.SerializationFailure.String() {
+		err = withSerializationFailureHints(err)
+	}
+
+	// Populate the details and hints from the error chain.
+	resErr.Hint = errors.FlattenHints(err)
+	resErr.Detail = errors.FlattenDetails(err)
+
+	// Add enhanced hints from the hint registry if enabled.
+	if sv == nil || EnhancedHintsEnabled.Get(sv) {
+		code := pgcode.MakeCode(resErr.Code)
+		template := GetHintForCode(code)
+		if template.Hint != "" {
+			formattedHint := FormatHintWithDocLink(template)
+			if resErr.Hint == "" {
+				resErr.Hint = formattedHint
+			} else {
+				// Append the enhanced hint to existing hints
+				resErr.Hint = resErr.Hint + "\n\n" + formattedHint
+			}
+		}
+	}
+
+	// Add a useful error prefix if not already there.
+	switch resErr.Code {
+	case pgcode.Internal.String():
+		// The string "internal error" clarifies the nature of the error
+		// to users, and is also introduced for compatibility with
+		// previous CockroachDB versions.
+		if !strings.HasPrefix(resErr.Message, InternalErrorPrefix) {
+			resErr.Message = InternalErrorPrefix + ": " + resErr.Message
+		}
+
+		// If the error flows towards a human user and does not get
+		// sent via telemetry, we want to empower the user to
+		// file a moderately useful error report. For this purpose,
+		// append the innermost stack trace.
+		resErr.Detail += getInnerMostStackTraceAsDetail(err)
+
+	case pgcode.SerializationFailure.String():
+		// The string "restart transaction" is asserted by test code. This
+		// can be changed if/when test code learns to use the 40001 code
+		// (or the errors library) instead.
+		//
+		// TODO(knz): investigate whether 3rd party frameworks parse this
+		// string instead of using the pg code to determine whether to
+		// retry.
+		if !strings.HasPrefix(resErr.Message, TxnRetryMsgPrefix) {
+			resErr.Message = TxnRetryMsgPrefix + ": " + resErr.Message
+		}
+	}
+
+	return resErr
 }

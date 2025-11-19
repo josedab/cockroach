@@ -8,6 +8,7 @@ go_library(
         "constraint_name.go",
         "errors.go",
         "flatten.go",
+        "hints.go",
         "internal_errors.go",
         "pgcode.go",
         "severity.go",
@@ -20,6 +21,7 @@ go_library(
     deps = [
         "//pkg/build",
         "//pkg/docs",
+        "//pkg/settings",
         "//pkg/sql/pgwire/pgcode",
         "@com_github_cockroachdb_errors//:errors",
         "@com_github_cockroachdb_errors//errorspb",
@@ -35,6 +37,7 @@ go_test(
         "constraint_name_test.go",
         "errors_test.go",
         "flatten_test.go",
+        "hints_test.go",
         "internal_errors_test.go",
         "main_test.go",
         "pgcode_test.go",
@@ -45,6 +48,7 @@ go_test(
     deps = [
         "//pkg/kv/kvpb",
         "//pkg/roachpb",
+        "//pkg/settings/cluster",
         "//pkg/sql/pgwire/pgcode",
         "//pkg/util/errorutil/unimplemented",
         "//pkg/util/hlc",
