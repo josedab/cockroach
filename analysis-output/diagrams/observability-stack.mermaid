@@ -1,0 +1,67 @@
+%% CockroachDB Observability Stack
+%% Commit SHA: 6ca473a526d30cccd2d55ea87a6bf4bd22db3e40
+
+graph TB
+    subgraph "Application"
+        Code[Application Code]
+    end
+
+    subgraph "Observability Infrastructure"
+        subgraph "Logging"
+            LC[Log Channels]
+            DEV[DEV]
+            OPS[OPS]
+            HEALTH[HEALTH]
+            PERF[SQL_PERF]
+        end
+
+        subgraph "Metrics"
+            MR[Metric Registry]
+            Counter[Counters]
+            Gauge[Gauges]
+            Hist[Histograms]
+        end
+
+        subgraph "Tracing"
+            Tracer[Tracer]
+            Spans[Spans]
+            Context[AmbientContext]
+        end
+    end
+
+    subgraph "External Systems"
+        Files[Log Files]
+        Prom[Prometheus]
+        OTEL[OpenTelemetry<br/>Jaeger/Zipkin]
+    end
+
+    Code --> LC
+    LC --> DEV
+    LC --> OPS
+    LC --> HEALTH
+    LC --> PERF
+    DEV --> Files
+    OPS --> Files
+    HEALTH --> Files
+    PERF --> Files
+
+    Code --> MR
+    MR --> Counter
+    MR --> Gauge
+    MR --> Hist
+    Counter --> Prom
+    Gauge --> Prom
+    Hist --> Prom
+
+    Code --> Context
+    Context --> Tracer
+    Tracer --> Spans
+    Spans --> OTEL
+
+    style Code fill:#e3f2fd
+    style LC fill:#fff8e1
+    style MR fill:#f3e5f5
+    style Tracer fill:#e8f5e9
+    style Files fill:#ffebee
+    style Prom fill:#ffebee
+    style OTEL fill:#ffebee

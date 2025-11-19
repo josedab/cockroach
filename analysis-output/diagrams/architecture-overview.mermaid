@@ -1,0 +1,63 @@
+%% CockroachDB Architecture Overview
+%% Commit SHA: 6ca473a526d30cccd2d55ea87a6bf4bd22db3e40
+
+graph TB
+    subgraph "Client Layer"
+        Client[Client Application]
+        PGWire[pgwire Protocol<br/>pkg/sql/pgwire/]
+    end
+
+    subgraph "SQL Layer"
+        Parser[Parser<br/>pkg/sql/parser/]
+        Optimizer[Optimizer<br/>pkg/sql/opt/]
+        Executor[Executor<br/>pkg/sql/colexec/]
+        ConnExec[ConnExecutor<br/>pkg/sql/conn_executor.go]
+        Schema[Schema Changer<br/>pkg/sql/schemachanger/]
+    end
+
+    subgraph "Distribution Layer"
+        TxnCoord[TxnCoordSender<br/>pkg/kv/kvclient/kvcoord/]
+        DistSender[DistSender<br/>pkg/kv/kvclient/kvcoord/]
+        RangeCache[Range Cache<br/>pkg/kv/kvclient/rangecache/]
+    end
+
+    subgraph "Replication Layer"
+        Replica[Replica<br/>pkg/kv/kvserver/replica.go]
+        Store[Store<br/>pkg/kv/kvserver/store.go]
+        Raft[Raft Consensus<br/>pkg/raft/]
+    end
+
+    subgraph "Storage Layer"
+        MVCC[MVCC<br/>pkg/storage/mvcc.go]
+        Pebble[Pebble Engine<br/>pkg/storage/pebble.go]
+    end
+
+    Client --> PGWire
+    PGWire --> ConnExec
+    ConnExec --> Parser
+    Parser --> Optimizer
+    Optimizer --> Executor
+    ConnExec --> Schema
+    Executor --> TxnCoord
+    TxnCoord --> DistSender
+    DistSender --> RangeCache
+    DistSender --> Replica
+    Replica --> Raft
+    Replica --> MVCC
+    MVCC --> Pebble
+
+    style Client fill:#e1f5fe
+    style PGWire fill:#e1f5fe
+    style Parser fill:#fff3e0
+    style Optimizer fill:#fff3e0
+    style Executor fill:#fff3e0
+    style ConnExec fill:#fff3e0
+    style Schema fill:#fff3e0
+    style TxnCoord fill:#f3e5f5
+    style DistSender fill:#f3e5f5
+    style RangeCache fill:#f3e5f5
+    style Replica fill:#e8f5e9
+    style Store fill:#e8f5e9
+    style Raft fill:#e8f5e9
+    style MVCC fill:#fce4ec
+    style Pebble fill:#fce4ec

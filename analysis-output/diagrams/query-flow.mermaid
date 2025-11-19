@@ -1,0 +1,37 @@
+%% SQL Query Processing Flow
+%% Commit SHA: 6ca473a526d30cccd2d55ea87a6bf4bd22db3e40
+
+sequenceDiagram
+    participant C as Client
+    participant CE as ConnExecutor
+    participant P as Parser
+    participant OB as OptBuilder
+    participant O as Optimizer
+    participant EB as ExecBuilder
+    participant E as Executor
+    participant KV as KV Layer
+
+    C->>CE: SQL Query
+    CE->>P: Parse(sql)
+    P-->>CE: AST
+
+    CE->>OB: Build(ast)
+    Note over OB: Name resolution<br/>Type checking<br/>Semantic analysis
+    OB-->>CE: Memo
+
+    CE->>O: Optimize()
+    Note over O: Normalization rules<br/>Exploration rules<br/>Cost estimation
+    O-->>CE: OptExpr
+
+    CE->>EB: Build(optExpr)
+    EB-->>CE: Execution Plan
+
+    CE->>E: Execute(plan)
+
+    loop For each operation
+        E->>KV: Read/Write
+        KV-->>E: Result
+    end
+
+    E-->>CE: Results
+    CE-->>C: Response

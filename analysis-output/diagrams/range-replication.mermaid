@@ -1,0 +1,51 @@
+%% Range-based Replication
+%% Commit SHA: 6ca473a526d30cccd2d55ea87a6bf4bd22db3e40
+
+graph TB
+    subgraph "Key Space"
+        KS[Key Space: MinKey to MaxKey]
+    end
+
+    subgraph "Ranges"
+        R1[Range 1<br/>keys: a-m]
+        R2[Range 2<br/>keys: m-t]
+        R3[Range 3<br/>keys: t-z]
+    end
+
+    subgraph "Node 1"
+        R1N1[Range 1<br/>Leaseholder]
+        R2N1[Range 2<br/>Follower]
+    end
+
+    subgraph "Node 2"
+        R1N2[Range 1<br/>Follower]
+        R2N2[Range 2<br/>Leaseholder]
+        R3N2[Range 3<br/>Follower]
+    end
+
+    subgraph "Node 3"
+        R1N3[Range 1<br/>Follower]
+        R3N3[Range 3<br/>Leaseholder]
+    end
+
+    KS --> R1
+    KS --> R2
+    KS --> R3
+
+    R1 -.-> R1N1
+    R1 -.-> R1N2
+    R1 -.-> R1N3
+
+    R2 -.-> R2N1
+    R2 -.-> R2N2
+
+    R3 -.-> R3N2
+    R3 -.-> R3N3
+
+    style R1N1 fill:#c8e6c9
+    style R2N2 fill:#c8e6c9
+    style R3N3 fill:#c8e6c9
+    style R1N2 fill:#e3f2fd
+    style R1N3 fill:#e3f2fd
+    style R2N1 fill:#e3f2fd
+    style R3N2 fill:#e3f2fd

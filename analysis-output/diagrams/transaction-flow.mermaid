@@ -1,0 +1,42 @@
+%% Distributed Transaction Flow
+%% Commit SHA: 6ca473a526d30cccd2d55ea87a6bf4bd22db3e40
+
+sequenceDiagram
+    participant App as Application
+    participant TCS as TxnCoordSender
+    participant Int as Interceptors
+    participant DS as DistSender
+    participant R as Replica
+    participant Raft as Raft Group
+
+    App->>TCS: Begin Transaction
+
+    Note over TCS: Create transaction record<br/>Start heartbeat
+
+    App->>TCS: Put(key1, val1)
+    TCS->>Int: Process through stack
+    Note over Int: 1. Heartbeater<br/>2. SeqNumAllocator<br/>3. Pipeliner<br/>4. SpanRefresher
+    Int->>DS: Route to range
+    DS->>R: Send BatchRequest
+    R->>Raft: Propose
+    Raft-->>R: Committed
+    R-->>DS: Write Intent Created
+    DS-->>Int: Response
+    Int-->>TCS: Pipelined OK
+
+    App->>TCS: Put(key2, val2)
+    Note over TCS,R: Similar flow for second write
+
+    App->>TCS: Commit
+    TCS->>Int: Parallel Commit
+    Note over Int: Committer interceptor<br/>batches writes + STAGING
+    Int->>DS: BatchRequest + EndTxn
+    DS->>R: Send to ranges
+    R->>Raft: Propose commit
+    Raft-->>R: Committed
+    R-->>DS: COMMITTED status
+    DS-->>Int: Success
+    Int-->>TCS: Transaction committed
+    TCS-->>App: Commit OK
+
+    Note over R: Async intent resolution

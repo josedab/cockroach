@@ -1,0 +1,38 @@
+%% TxnCoordSender Interceptor Stack
+%% Commit SHA: 6ca473a526d30cccd2d55ea87a6bf4bd22db3e40
+
+graph TB
+    subgraph "TxnCoordSender"
+        Request[Incoming Request]
+
+        subgraph "Interceptor Stack"
+            H[1. Heartbeater<br/>Keeps txn alive]
+            S[2. SeqNumAllocator<br/>Assigns sequence numbers]
+            P[3. Pipeliner<br/>Enables write pipelining]
+            R[4. SpanRefresher<br/>Handles timestamp push]
+            C[5. Committer<br/>Manages commit protocol]
+            M[6. Metrics<br/>Collects statistics]
+            L[7. LockFootprint<br/>Tracks locked keys]
+        end
+
+        DS[DistSender]
+    end
+
+    Request --> H
+    H --> S
+    S --> P
+    P --> R
+    R --> C
+    C --> M
+    M --> L
+    L --> DS
+
+    style Request fill:#e3f2fd
+    style H fill:#fff8e1
+    style S fill:#fff8e1
+    style P fill:#fff8e1
+    style R fill:#fff8e1
+    style C fill:#fff8e1
+    style M fill:#fff8e1
+    style L fill:#fff8e1
+    style DS fill:#e8f5e9
