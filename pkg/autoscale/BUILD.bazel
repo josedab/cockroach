@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "autoscale",
+    srcs = [
+        "metrics.go",
+        "pattern.go",
+        "predictor.go",
+        "scaler.go",
+        "settings.go",
+        "types.go",
+    ],
+    importpath = "github.com/cockroachdb/cockroach/pkg/autoscale",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/settings",
+    ],
+)
+
+go_test(
+    name = "autoscale_test",
+    size = "small",
+    srcs = [
+        "autoscale_test.go",
+    ],
+    embed = [":autoscale"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+    ],
+)

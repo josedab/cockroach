@@ -232,6 +232,8 @@ var crdbInternal = virtualSchema{
 		catconstants.CrdbInternalStoreLivenessSupportFrom:           crdbInternalStoreLivenessSupportFromTable,
 		catconstants.CrdbInternalStoreLivenessSupportFor:            crdbInternalStoreLivenessSupportForTable,
 		catconstants.CrdbInternalClusterInspectErrorsViewID:         crdbInternalClusterInspectErrorsView,
+		catconstants.CrdbInternalScalingPredictionsTableID:          crdbInternalScalingPredictionsTable,
+		catconstants.CrdbInternalScalingHistoryTableID:              crdbInternalScalingHistoryTable,
 	},
 	validWithNoDatabaseContext: true,
 }
@@ -9698,4 +9700,65 @@ CREATE VIEW crdb_internal.cluster_inspect_errors AS
 		{Name: "crdb_internal_expiration", Typ: types.TimestampTZ},
 	},
 	comment: `wrapper over system.inspect_errors`,
+}
+
+// crdbInternalScalingPredictionsTable exposes predictive auto-scaling predictions.
+var crdbInternalScalingPredictionsTable = virtualSchemaTable{
+	comment: `predictive auto-scaling load predictions (RAM)`,
+	schema: `
+CREATE TABLE crdb_internal.scaling_predictions (
+  predicted_time       TIMESTAMPTZ NOT NULL,
+  predicted_load       DECIMAL NOT NULL,
+  confidence           DECIMAL NOT NULL,
+  recommended_action   STRING NOT NULL,
+  recommended_nodes    INT NOT NULL
+)`,
+	populate: func(ctx context.Context, p *planner, _ catalog.DatabaseDescriptor, addRow func(...tree.Datum) error) error {
+		// Check for admin or VIEWCLUSTERMETADATA privilege
+		hasPriv, err := p.HasPrivilege(ctx, syntheticprivilege.GlobalPrivilegeObject, privilege.VIEWCLUSTERMETADATA, p.User())
+		if err != nil {
+			return err
+		}
+		if !hasPriv {
+			return pgerror.Newf(pgcode.InsufficientPrivilege,
+				"user %s does not have %s privilege",
+				p.User(), privilege.VIEWCLUSTERMETADATA)
+		}
+
+		// TODO(autoscale): Integrate with actual prediction service
+		// For now, return empty result set as predictions require historical data
+		return nil
+	},
+}
+
+// crdbInternalScalingHistoryTable exposes historical auto-scaling events.
+var crdbInternalScalingHistoryTable = virtualSchemaTable{
+	comment: `predictive auto-scaling history (RAM)`,
+	schema: `
+CREATE TABLE crdb_internal.scaling_history (
+  time        TIMESTAMPTZ NOT NULL,
+  action      STRING NOT NULL,
+  from_nodes  INT NOT NULL,
+  to_nodes    INT NOT NULL,
+  reason      STRING NOT NULL,
+  confidence  DECIMAL NOT NULL,
+  success     BOOL NOT NULL,
+  error       STRING
+)`,
+	populate: func(ctx context.Context, p *planner, _ catalog.DatabaseDescriptor, addRow func(...tree.Datum) error) error {
+		// Check for admin or VIEWCLUSTERMETADATA privilege
+		hasPriv, err := p.HasPrivilege(ctx, syntheticprivilege.GlobalPrivilegeObject, privilege.VIEWCLUSTERMETADATA, p.User())
+		if err != nil {
+			return err
+		}
+		if !hasPriv {
+			return pgerror.Newf(pgcode.InsufficientPrivilege,
+				"user %s does not have %s privilege",
+				p.User(), privilege.VIEWCLUSTERMETADATA)
+		}
+
+		// TODO(autoscale): Integrate with actual scaling history store
+		// For now, return empty result set
+		return nil
+	},
 }
