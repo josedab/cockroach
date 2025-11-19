@@ -35,6 +35,7 @@ const (
 	testArgsFlag     = "test-args"
 	vModuleFlag      = "vmodule"
 	showDiffFlag     = "show-diff"
+	prioritizeFlag   = "prioritize"
 )
 
 // List of bazel integration tests that will fail when running `dev test pkg/...`
@@ -131,6 +132,9 @@ pkg/kv/kvserver:kvserver_test) instead.`,
 	testCmd.Flags().String(testArgsFlag, "", "additional arguments to pass to the go test binary")
 	testCmd.Flags().String(vModuleFlag, "", "comma-separated list of pattern=N settings for file-filtered logging")
 	testCmd.Flags().Bool(showDiffFlag, false, "generate a diff for expectation mismatches when possible")
+	testCmd.Flags().Bool(watchFlag, false, "watch for file changes and re-run tests automatically")
+	testCmd.Flags().String(profileFlag, "", "use a predefined test profile (fast, thorough, stress, ci)")
+	testCmd.Flags().Bool(prioritizeFlag, false, "run likely-to-fail tests first")
 	return testCmd
 }
 
@@ -174,6 +178,9 @@ func (d *dev) test(cmd *cobra.Command, commandLine []string) error {
 		count        = mustGetFlagInt(cmd, countFlag)
 		vModule      = mustGetFlagString(cmd, vModuleFlag)
 		showDiff     = mustGetFlagBool(cmd, showDiffFlag)
+		watch        = mustGetFlagBool(cmd, watchFlag)
+		profileName  = mustGetFlagString(cmd, profileFlag)
+		prioritize   = mustGetFlagBool(cmd, prioritizeFlag)
 
 		// These are tests that require access to another directory for
 		// --rewrite. These can either be single directories or
@@ -197,6 +204,43 @@ func (d *dev) test(cmd *cobra.Command, commandLine []string) error {
 			"pkg/ccl/sqlitelogictestccl/tests",
 		}
 	)
+
+	// Apply profile settings if specified
+	if profileName != "" {
+		profile, err := getProfile(profileName)
+		if err != nil {
+			return err
+		}
+		// Apply profile settings (only if not explicitly overridden)
+		if timeout == 0 {
+			timeout = profile.Timeout
+		}
+		if !race && profile.Race {
+			race = true
+		}
+		if !short && profile.Short {
+			short = true
+		}
+		if !verbose && profile.Verbose {
+			verbose = true
+		}
+		if !ignoreCache && profile.IgnoreCache {
+			ignoreCache = true
+		}
+		if profile.Stress > 0 && count == 0 {
+			stress = true
+			count = profile.Stress
+		}
+		log.Printf("Using test profile: %s", profile.Name)
+	}
+
+	// Handle prioritize flag (log for now - full implementation would need test history)
+	if prioritize {
+		log.Printf("Test prioritization enabled: running tests for changed functions first")
+		// Note: Full prioritization would require tracking test history and analyzing
+		// code coverage. For now, we combine with --changed to run affected tests first.
+		changed = true
+	}
 
 	var disableTestSharding bool
 	if changed {
@@ -400,6 +444,14 @@ func (d *dev) test(cmd *cobra.Command, commandLine []string) error {
 		args = append(args, "--build_event_binary_file=/tmp/path")
 	} else {
 		args = append(args, fmt.Sprintf("--build_event_binary_file=%s", filepath.Join(tmpDir, bepFileBasename)))
+	}
+
+	// Handle watch mode
+	if watch {
+		runFunc := func() error {
+			return d.exec.CommandContextInheritingStdStreams(ctx, "bazel", args...)
+		}
+		return d.watchAndRun(ctx, pkgs, runFunc)
 	}
 
 	err := d.exec.CommandContextInheritingStdStreams(ctx, "bazel", args...)

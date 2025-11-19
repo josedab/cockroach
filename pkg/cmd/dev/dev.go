@@ -128,6 +128,10 @@ Typical usage:
 		makeUICmd(&ret),
 		makeRoachprodStressCmd(ret.roachprodStress),
 		makeTestBinariesCmd(ret.testBinaries),
+		// Quick commands for faster developer iteration
+		makeQuickTestCmd(ret.quickTest),
+		makeQuickBuildCmd(ret.quickBuild),
+		makeQuickLintCmd(ret.quickLint),
 	)
 
 	// Add all the shared flags.
